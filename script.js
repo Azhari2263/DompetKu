@@ -45,6 +45,7 @@ const appContainer = document.getElementById('app-container');
 const toggleSaldoButton = document.getElementById('toggle-saldo-button');
 const iconEyeOpen = document.getElementById('icon-eye-open');
 const iconEyeClosed = document.getElementById('icon-eye-closed');
+const doughnutChartText = document.getElementById('doughnut-chart-text');
 
 // VARIABEL GLOBAL
 let doughnutChart;
@@ -64,7 +65,6 @@ const navigateTo = (pageId) => {
 
     document.querySelectorAll(targetLinkSelector).forEach(link => link.classList.add('active'));
 
-    // Set tanggal hari ini jika membuka halaman tambah transaksi
     if (pageId === 'page-new-transaction') {
         document.getElementById('tanggal').valueAsDate = new Date();
     }
@@ -144,14 +144,19 @@ const renderHistoryList = (transactions) => {
 
         const actionButtons = document.createElement('div');
         actionButtons.className = 'flex gap-1';
-        actionButtons.innerHTML = `
-            <button onclick="openEditModal(${trx.id}, '${trx.tanggal}', '${trx.jenis}', '${encodeURIComponent(trx.deskripsi)}', ${trx.jumlah})" class="text-slate-400 hover:text-blue-600 p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
-            </button>
-            <button onclick="openDeleteConfirmationModal(${trx.id})" class="text-slate-400 hover:text-red-600 p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-            </button>
-        `;
+
+        const editButton = document.createElement('button');
+        editButton.className = 'text-slate-400 hover:text-blue-600 p-1';
+        editButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>`;
+        editButton.addEventListener('click', () => openEditModal(trx.id, trx.tanggal, trx.jenis, trx.deskripsi, trx.jumlah));
+
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'text-slate-400 hover:text-red-600 p-1';
+        deleteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>`;
+        deleteButton.addEventListener('click', () => openDeleteConfirmationModal(trx.id));
+
+        actionButtons.appendChild(editButton);
+        actionButtons.appendChild(deleteButton);
 
         rightSection.appendChild(amountEl);
         rightSection.appendChild(actionButtons);
@@ -177,44 +182,48 @@ const updateSummaryAndCharts = (transactionsForPeriod) => {
     totalPemasukanEl.textContent = formatRupiah(pemasukanPeriod);
     totalPengeluaranEl.textContent = formatRupiah(pengeluaranPeriod);
 
-    renderDoughnutChart(transactionsForPeriod);
+    renderDoughnutChart(pemasukanPeriod, pengeluaranPeriod);
     renderDailyCharts(transactionsForPeriod);
 };
 
-const renderDoughnutChart = (transactions) => {
+const renderDoughnutChart = (pemasukan, pengeluaran) => {
     const ctx = document.getElementById('doughnut-chart-dashboard').getContext('2d');
-    const pemasukan = transactions.filter(t => t.jenis === 'Pemasukan').reduce((sum, t) => sum + t.jumlah, 0);
-    const pengeluaran = transactions.filter(t => t.jenis === 'Pengeluaran').reduce((sum, t) => sum + t.jumlah, 0);
+
+    let percentage = 0;
+    if (pemasukan > 0) {
+        percentage = Math.round((pengeluaran / pemasukan) * 100);
+    }
+    if (percentage > 100) percentage = 100;
+
+    const data = [percentage, 100 - percentage];
 
     if (doughnutChart) doughnutChart.destroy();
 
     doughnutChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Pemasukan', 'Pengeluaran'],
             datasets: [{
-                data: [pemasukan, pengeluaran],
-                backgroundColor: ['#22c55e', '#ef4444'],
+                data: data,
+                backgroundColor: ['#3b82f6', '#e5e7eb'], // blue-500, gray-200
                 borderColor: '#f8fafc',
                 borderWidth: 4,
-                hoverOffset: 8
+                hoverOffset: 8,
+                circumference: 360,
+                rotation: -90
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '70%',
+            cutout: '80%',
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20
-                    }
-                },
-                tooltip: { callbacks: { label: (context) => `${context.label}: ${formatRupiah(context.parsed)}` } }
+                legend: { display: false },
+                tooltip: { enabled: false }
             }
         },
     });
+
+    doughnutChartText.querySelector('span:first-child').textContent = `${percentage}%`;
 };
 
 const renderDailyCharts = (transactions) => {
@@ -302,7 +311,7 @@ const fetchTransactions = async () => {
         const response = await fetch(SCRIPT_URL);
         if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
         const data = await response.json();
-        allTransactions = data.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+        allTransactions = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         applyFilters();
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -340,10 +349,15 @@ const applyFilters = () => {
     updateSummaryAndCharts(transactionsForPeriod);
 };
 
-window.openEditModal = (id, tanggal, deskripsiEncoded, jenis, jumlah) => {
-    const deskripsi = decodeURIComponent(deskripsiEncoded);
+window.openEditModal = (id, tanggal, jenis, deskripsi, jumlah) => {
     editForm.querySelector('#edit-id').value = id;
-    editForm.querySelector('#edit-tanggal').value = new Date(tanggal).toISOString().split('T')[0];
+
+    // Timezone-safe date setting
+    const d = new Date(tanggal);
+    const offset = d.getTimezoneOffset();
+    const correctedDate = new Date(d.getTime() - (offset * 60 * 1000));
+    editForm.querySelector('#edit-tanggal').value = correctedDate.toISOString().split('T')[0];
+
     editForm.querySelector('#edit-jenis').value = jenis;
     editForm.querySelector('#edit-deskripsi').value = deskripsi;
     editForm.querySelector('#edit-jumlah').value = jumlah;
